@@ -1,0 +1,44 @@
+!! functionhooks
+lsth
+!!endfunctionhooks
+
+# This is the standard article assumed to exist.
+!! article
+Sections
+!! text
+this is the intro
+==1==
+
+sec 1
+
+==2==
+
+sec 2
+
+===3===
+
+sec 3
+
+==a==
+
+sec a
+!! endarticle
+
+!!test
+transclude a heading
+!!input
+{{#lsth:sections|1}}
+!!result
+<p><br />
+sec 1
+</p>
+!!end
+
+!!test
+transclude the intro
+!!input
+{{#lsth:sections}}
+!!result
+<p>this is the intro
+</p>
+!!end
