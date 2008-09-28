@@ -24,21 +24,20 @@ my $add_month;
 my $cut_date;
 my $p='';
 my $page = 'Wikisource:Scriptorium';
+my $be_anon;
+my $force;
 
 GetOptions('debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
-	   'list'=>\$do_list, 'edit!'=>\$do_edit,
+	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'add!'=>\$add_month,
-	   'cut=i'=>\$cut_date,);
-
-# my $wiki = Perlwikipedia->new('Perl');
-# $wiki->set_wiki('en.wikisource.org', 'w');
-# my $l = $wiki->login($username, $password);
-# print "status = $l, err=$wiki->{errstr}\n";
-# die "login failed? - $wiki->{errstr}" unless $wiki->{errstr} eq '';
+	   'cut=i'=>\$cut_date,'force!'=>\$force);
 
 #my $wiki = FrameWorkPW->new('en.wikisource.org');
 my $wiki = FrameworkAPI->new('en.wikisource.org');
-$wiki->login('Sanbeg (bot)', 'lst');
+$be_anon = 1 unless $do_edit;
+$wiki->login($::username, $::password) unless $be_anon;
+$wiki->_groups;
+
 $wiki->{write_prefix} = $p;
 
 unless (defined $cut_date) {
@@ -90,7 +89,7 @@ sub f() {
 	print "$tlevel . $tline : $months[$tdate%100] ",$tdate/100,"\n" if $debug;
 	if ($tdate <= $cut_date) {
 	    push @close, [$tline, $. -1];
-	    $archive_summary .= "$list_sep $thead";
+	    #$archive_summary .= "$list_sep $thead";
 	    $list_sep = '|';
 	    return 1;
 	}
@@ -121,7 +120,7 @@ while (<FH>) {
 	} else {
 	    f();
 	    $tlevel = 7;
-	    $archive_summary .=  "\n**[[$anchor#$2|$2]]";
+	    #$archive_summary .=  "\n**[[$anchor#$2|$2]]";
 	    $list_sep = ':';
 	};
 
@@ -136,7 +135,7 @@ while (<FH>) {
 };
 
 my @close2 = @close;
-die "nothing to archive" unless @close;
+die "nothing to archive" unless $force or @close;
 
 my $edit_summary =  "[bot] automated archival of ".@close." sections older than 1 month\n";
 
@@ -146,16 +145,61 @@ print "\n$edit_summary\n$archive_summary\n";
 my ($buf_open, $buf_close) = ('','');
 
 ############################################################
+my $archive_page = "$page/Archives";
+my $subpage = $archive_page . $anchor;
+print "$subpage\n";
+
+
+############################################################
 #print closed entries;
 #open CFH, ">", \$buf_close or die "open failed: $!";
 #binmode(CFH);
 seek FH, 0,0;
 $. = 0;
+
+my $sub_pg = $wiki->get_page ($subpage);
+
+my %merge_text;
+my @majors;
+
+if ($sub_pg->exists) {
+    warn "$subpage exists, merging";
+
+    my $buf = $sub_pg->get_text;
+    die "$page: missing" unless defined $buf;
+    
+    open my($fh), '<', \$buf or die "couldn't open handle: $!";
+
+    my $major = '';
+
+    while (<$fh>) {
+	/^(\=+)\s*(.+?)\s*\1$/ and do {
+	    my $level = length($1);
+	    if ($level == 1) {
+		$major = $2;
+		push @majors, $major;
+	    }
+	};
+	$merge_text{$major} .= $_;
+    }
+    close $fh;
+}
+
+
+
 while (<FH>) {
-    /^(\=+)(.+?)\1$/ and do {
+    /^(\=+)\s*(.+?)\s*\1$/ and do {
 	my $level = length($1);
 	#print CFH if $level == 1;
-	$buf_close .= $_ if $level == 1;
+	if ($level == 1) {
+	    if (defined $merge_text{$2}) {
+		$buf_close .= delete $merge_text{$2};
+		#delete $merge_text{$2};
+	    } else {
+		warn "no heading: $2";
+		$buf_close .= $_;
+	    }
+	}
     };
     
     #print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
@@ -164,6 +208,38 @@ while (<FH>) {
     last unless @close;
 };
 #close CFH;
+
+foreach my $heading (@majors) {
+    $buf_close .= delete $merge_text{$heading} 
+    if (defined $merge_text{$heading});
+};
+foreach my $c (keys %merge_text) {
+    warn "unused heading: $c";
+};
+
+#rescan summary from closed page, since some won't be ours.
+
+{
+    open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
+
+    my $thead='';
+    my $fs;
+    while (<$fh>) {
+	/^(\=+)(.+?)\1$/ and do {
+	    my $level = length($1);
+	    if ($level == 1) {
+		$fs = "\n**[[$anchor#$2|$2]]:";
+	    } elsif ($level == 2) {
+		$archive_summary .= $fs . $2;
+		$fs = '|';
+	    }
+	};
+    }
+    close $fh;
+    $archive_summary .= "</small>\n";
+    #print "new sum is $archive_summary";
+}
+
 
 ############################################################
 
@@ -176,7 +252,8 @@ $. = 0;
 while (<FH>) {
     last unless @close2;
     #print OFH if ($. < $close2[0][0]);
-    $buf_open .= $_ if ($. < $close2[0][0]);
+#FIXME CHECK - lost 1 line before, was $. < $close2...
+    $buf_open .= $_ if ($. < $close2[0][0]); 
     shift @close2 if $. == $close2[0][1];
 }
 #print OFH while <FH>;
@@ -202,26 +279,25 @@ if (defined $cfn) {
 
 ############################## the real thing ##############################
 
-my $archive_page = "$page/Archives";
-my $subpage = $archive_page . $anchor;
-print "$subpage\n";
-
 if ($do_edit) {
 
-    my $archive_page = "$page/Archives";
-    my $subpage = $archive_page . $anchor;
-
-#     $wiki->edit($p.$subpage, ($buf_close), $edit_summary, undef, '&assert=bot');
-#     my $text = $wiki->get_text($archive_page) . $archive_summary . '</small>';
-#     $wiki->edit($p.$archive_page,$text, $edit_summary, undef, '&assert=bot');
-#     $wiki->edit($p.$page, ($buf_open), $edit_summary, undef, '&assert=bot');
+    warn "doing edit";
 
     my $archive_pg = $wiki->get_page ($archive_page);
-    my $sub_pg = $wiki->create_page ($subpage);
 
     $sub_pg->edit($buf_close, $edit_summary);
     
-    my $text = $archive_pg->get_text . $archive_summary . '</small>';
+    #my $text = $archive_pg->get_text . $archive_summary;
+    #kill links to our page, so we can regen..
+
+    my $text = '';
+    my $temp_text = $archive_pg->get_text;
+    foreach my $line (split "\n", $temp_text) {
+	$text .= "$line\n" unless $line =~ /^\*+\[\[$anchor/;
+    }
+    $text .= $archive_summary;
+    #print "text is:\n $text";
+
     $archive_pg->edit($text,$edit_summary);
     $pg->edit($buf_open, $edit_summary);
 
