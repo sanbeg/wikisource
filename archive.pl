@@ -20,7 +20,7 @@ my $cfn;
 my $ofn;
 my $do_list;
 my $do_edit;
-my $add_month;
+my $add_month=1;
 my $cut_date;
 my $p='';
 my $page = 'Wikisource:Scriptorium';
@@ -188,6 +188,7 @@ if ($sub_pg->exists) {
 
 
 while (<FH>) {
+    last unless @close;
     /^(\=+)\s*(.+?)\s*\1$/ and do {
 	my $level = length($1);
 	#print CFH if $level == 1;
@@ -205,7 +206,6 @@ while (<FH>) {
     #print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
     $buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
     shift @close if $. == $close[0][1];
-    last unless @close;
 };
 #close CFH;
 
@@ -250,7 +250,7 @@ seek FH, 0,0;
 $. = 0;
 
 while (<FH>) {
-    last unless @close2;
+    $buf_open .= $_, last unless @close2;
     #print OFH if ($. < $close2[0][0]);
 #FIXME CHECK - lost 1 line before, was $. < $close2...
     $buf_open .= $_ if ($. < $close2[0][0]); 
@@ -301,4 +301,5 @@ if ($do_edit) {
     $archive_pg->edit($text,$edit_summary);
     $pg->edit($buf_open, $edit_summary);
 
-}
+};
+
