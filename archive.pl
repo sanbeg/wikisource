@@ -36,7 +36,6 @@ GetOptions('debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn,
 my $wiki = FrameworkAPI->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
 $wiki->login($::username, $::password) unless $be_anon;
-$wiki->_groups;
 
 $wiki->{write_prefix} = $p;
 
