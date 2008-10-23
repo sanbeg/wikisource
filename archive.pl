@@ -26,11 +26,12 @@ my $p='';
 my $page = 'Wikisource:Scriptorium';
 my $be_anon;
 my $force;
+my $level_2_header = 3;
 
 GetOptions('debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'add!'=>\$add_month,
-	   'cut=i'=>\$cut_date,'force!'=>\$force);
+	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$level_2_header);
 
 #my $wiki = FrameWorkPW->new('en.wikisource.org');
 my $wiki = FrameworkAPI->new('en.wikisource.org');
@@ -228,7 +229,7 @@ foreach my $c (keys %merge_text) {
 	    my $level = length($1);
 	    if ($level == 1) {
 		$fs = "\n**[[$anchor#$2|$2]]:";
-	    } elsif ($level == 2) {
+	    } elsif ($level <= $level_2_header) {
 		$archive_summary .= $fs . $2;
 		$fs = '|';
 	    }
