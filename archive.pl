@@ -26,12 +26,30 @@ my $p='';
 my $page = 'Wikisource:Scriptorium';
 my $be_anon;
 my $force;
-my $level_2_header = 3;
+my $header_level = 1;
+
+sub relocate_links {
+    my @strip_state;
+    for (@_) {
+	my $strip_text=sub( $ ) {
+	    push (@strip_state, $_[0]);
+	
+	    return "<$#strip_state>";
+	};
+
+   
+	s{(<(nowiki|pre)\s*>(.*?)</\2\s*>|<[0-9]+>)}{$strip_text->($1)}ge;
+	s{\Q[[/}{[[../../}g;
+
+	s{<([0-9]+)>}{$strip_state[$1]}ge;
+	@strip_state = ();
+    }
+}
 
 GetOptions('debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'add!'=>\$add_month,
-	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$level_2_header);
+	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level);
 
 #my $wiki = FrameWorkPW->new('en.wikisource.org');
 my $wiki = FrameworkAPI->new('en.wikisource.org');
@@ -102,13 +120,14 @@ my $pg = $wiki->get_page($page);
 my $buf = $pg->get_text;
 die "$page: missing" unless defined $buf;
 
-open FH, '<', \$buf or die "couldn't open handle: $!";
-#binmode (FH);
+open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
+#binmode (PAGE_FH);
 
-while (<FH>) {
+##scan for closed sections
+while (<PAGE_FH>) {
     /^(\=+)(.+?)\1$/ and do {
 	my $level = length($1);
-	if ($level > 1) {
+	if ($level > $header_level) {
 	    if ($level <= $tlevel) {
 		f();
 		$tlevel = $level;
@@ -137,12 +156,12 @@ while (<FH>) {
 my @close2 = @close;
 die "nothing to archive" unless $force or @close;
 
-my $edit_summary =  "[bot] automated archival of ".@close." sections older than 1 month\n";
+my $edit_summary =  "[bot] automated archival of ".@close." sections older than 1 month";
 
 print "\n$edit_summary\n$archive_summary\n";
 
 
-my ($buf_open, $buf_close) = ('','');
+my ($buf_open) = ('');
 
 ############################################################
 my $archive_page = "$page/Archives";
@@ -154,7 +173,7 @@ print "$subpage\n";
 #print closed entries;
 #open CFH, ">", \$buf_close or die "open failed: $!";
 #binmode(CFH);
-seek FH, 0,0;
+seek PAGE_FH, 0,0;
 $. = 0;
 
 my $sub_pg = $wiki->get_page ($subpage);
@@ -162,6 +181,7 @@ my $sub_pg = $wiki->get_page ($subpage);
 my %merge_text;
 my @majors;
 
+##slurp existing entries from subpage
 if ($sub_pg->exists) {
     warn "$subpage exists, merging";
 
@@ -185,14 +205,16 @@ if ($sub_pg->exists) {
     close $fh;
 }
 
+##copy closed threads, merging in subpage.
+my $buf_close = exists($merge_text{''}) ?
+    delete $merge_text{''} : "{{archive header}}\n";
 
-
-while (<FH>) {
+while (<PAGE_FH>) {
     last unless @close;
     /^(\=+)\s*(.+?)\s*\1$/ and do {
 	my $level = length($1);
 	#print CFH if $level == 1;
-	if ($level == 1) {
+	if ($level <= $header_level) {
 	    if (defined $merge_text{$2}) {
 		$buf_close .= delete $merge_text{$2};
 		#delete $merge_text{$2};
@@ -209,6 +231,7 @@ while (<FH>) {
 };
 #close CFH;
 
+
 foreach my $heading (@majors) {
     $buf_close .= delete $merge_text{$heading} 
     if (defined $merge_text{$heading});
@@ -217,6 +240,9 @@ foreach my $c (keys %merge_text) {
     warn "unused heading: $c";
 };
 
+
+relocate_links $buf_close;
+
 #rescan summary from closed page, since some won't be ours.
 
 {
@@ -224,20 +250,24 @@ foreach my $c (keys %merge_text) {
 
     my $thead='';
     my $fs;
+    $tlevel = 7;
+
     while (<$fh>) {
 	/^(\=+)(.+?)\1$/ and do {
 	    my $level = length($1);
-	    if ($level == 1) {
+	    if ($level <= $header_level) {
 		$fs = "\n**[[$anchor#$2|$2]]:";
-	    } elsif ($level <= $level_2_header) {
+		$tlevel = 7;
+	    } elsif ($level <= $tlevel) {
 		$archive_summary .= $fs . $2;
 		$fs = '|';
+		$tlevel = $level;
 	    }
 	};
     }
     close $fh;
     $archive_summary .= "</small>\n";
-    #print "new sum is $archive_summary";
+    print "new sum is:\n $archive_summary\n" if $debug;
 }
 
 
@@ -246,10 +276,10 @@ foreach my $c (keys %merge_text) {
 #print open entries;
 #open OFH, ">", \$buf_open or die "open failed: $!";
 #binmode(OFH);
-seek FH, 0,0;
+seek PAGE_FH, 0,0;
 $. = 0;
 
-while (<FH>) {
+while (<PAGE_FH>) {
     $buf_open .= $_, last unless @close2;
     #print OFH if ($. < $close2[0][0]);
 #FIXME CHECK - lost 1 line before, was $. < $close2...
@@ -257,11 +287,11 @@ while (<FH>) {
     shift @close2 if $. == $close2[0][1];
 }
 #print OFH while <FH>;
-$buf_open .= $_ while <FH>;
+$buf_open .= $_ while <PAGE_FH>;
 #close OFH;
 
 ############################################################
-close FH;
+close PAGE_FH;
 
 ############################## test ##############################
 if (defined $ofn) {
@@ -285,7 +315,7 @@ if ($do_edit) {
 
     my $archive_pg = $wiki->get_page ($archive_page);
 
-    $sub_pg->edit($buf_close, $edit_summary);
+    $sub_pg->edit($buf_close, $edit_summary . " from [[$page]]");
     
     #my $text = $archive_pg->get_text . $archive_summary;
     #kill links to our page, so we can regen..
@@ -299,7 +329,9 @@ if ($do_edit) {
     #print "text is:\n $text";
 
     $archive_pg->edit($text,$edit_summary);
-    $pg->edit($buf_open, $edit_summary);
 
-};
+
+    $pg->edit($buf_open, $edit_summary . " to [[$page/Archives$anchor]]");
+
+}
 
