@@ -20,8 +20,9 @@ my $cfn;
 my $ofn;
 my $do_list;
 my $do_edit;
-my $add_month=1;
 my $cut_date;
+my $archive_date;
+my $n_days = 30;
 my $p='';
 my $page = 'Wikisource:Scriptorium';
 my $be_anon;
@@ -37,18 +38,20 @@ sub relocate_links {
 	    return "<$#strip_state>";
 	};
 
-   
+	next unless m{\Q[[/};
+
 	s{(<(nowiki|pre)\s*>(.*?)</\2\s*>|<[0-9]+>)}{$strip_text->($1)}ge;
-	s{\Q[[/}{[[../../}g;
+	s{\Q[[/}{[[$page/}g;
 
 	s{<([0-9]+)>}{$strip_state[$1]}ge;
 	@strip_state = ();
     }
 }
 
-GetOptions('debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
+GetOptions('page=s'=>\$page,
+    'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
-	   'prefix=s'=>\$p, 'add!'=>\$add_month,
+	   'prefix=s'=>\$p, 'day=i'=>\$n_days,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level);
 
 #my $wiki = FrameWorkPW->new('en.wikisource.org');
@@ -58,30 +61,31 @@ $wiki->login($::username, $::password) unless $be_anon;
 
 $wiki->{write_prefix} = $p;
 
-unless (defined $cut_date) {
+unless (defined $archive_date) {
     my @now = localtime;
     my $m = $now[4];
     my $y = $now[5] + 1900;
 
-    for (1) {
-	if ($m>=1) {
-	    --$m;
-	} else {
-	    --$y;
-	    $m=11;
-	}
-    }
-    $cut_date = $m+$y*100;
+    $archive_date = $m+$y*100;
 }
 
-my $cut_y = int($cut_date/100);
-my $cut_m = $cut_date % 100;
+my $archive_year = int($archive_date/100);
+my $archive_month = $archive_date % 100 + 1;
 
-print "$cut_m/$cut_y\n";
-++$cut_m;
-++$cut_m if $add_month;
+print "$archive_month/$archive_year\n";
+my $anchor=sprintf "/$archive_year-%.2d", $archive_month;
 
-my $anchor=sprintf "/$cut_y-%.2d", $cut_m;
+#$cut_date *= 100;
+unless (defined $cut_date) {
+    my @now = localtime(time-60*60*24*$n_days);
+    my $d = $now[3];
+    my $m = $now[4];
+    my $y = $now[5] + 1900;
+    $cut_date = $d+$m*100+$y*10000;
+}
+  
+
+
 my @months=qw(January February March April May June July August September October November December);
 
 my %months;
@@ -100,11 +104,16 @@ my @close;
 my $list_sep;
 my $thead;
 
-my $archive_summary = "*[[$anchor|$months[$cut_m-1]]]<small>";
+my $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
 
 sub f() {
     if ($tlevel <= 6) {
-	print "$tlevel . $tline : $months[$tdate%100] ",$tdate/100,"\n" if $debug;
+	if ($debug){
+	    my $month = $months[int($tdate/100)%100];
+	    my $day = $tdate % 100;
+	    my $year = int($tdate / 10000);
+	    print "$tlevel . $tline : $month $day $year\n";
+	}
 	if ($tdate <= $cut_date) {
 	    push @close, [$tline, $. -1];
 	    #$archive_summary .= "$list_sep $thead";
@@ -146,9 +155,9 @@ while (<PAGE_FH>) {
 
 
     };
-    m/[0-9][0-9]:[0-9][0-9], [0-9]{1,2} (${month_re}) ([0-9]{4}) \(UTC\)/ and do  {
+    m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ and do  {
 	#print "$1 $2\n" if $debug;
-	my $nd = $2*100+$months{$1};
+	my $nd = $3*10000+$months{$2}*100+$1;
 	$tdate = $nd if $nd > $tdate;
     }
 };
@@ -156,7 +165,7 @@ while (<PAGE_FH>) {
 my @close2 = @close;
 die "nothing to archive" unless $force or @close;
 
-my $edit_summary =  "[bot] automated archival of ".@close." sections older than 1 month";
+my $edit_summary =  "[bot] automated archival of ".@close." sections older than $n_days days";
 
 print "\n$edit_summary\n$archive_summary\n";
 
@@ -179,12 +188,13 @@ $. = 0;
 my $sub_pg = $wiki->get_page ($subpage);
 
 my %merge_text;
+my $have_merge_text;
 my @majors;
 
 ##slurp existing entries from subpage
 if ($sub_pg->exists) {
     warn "$subpage exists, merging";
-
+    $have_merge_text=1;
     my $buf = $sub_pg->get_text;
     die "$page: missing" unless defined $buf;
     
@@ -219,7 +229,7 @@ while (<PAGE_FH>) {
 		$buf_close .= delete $merge_text{$2};
 		#delete $merge_text{$2};
 	    } else {
-		warn "no heading: $2";
+		warn "no heading: $2" if ($have_merge_text);
 		$buf_close .= $_;
 	    }
 	}
