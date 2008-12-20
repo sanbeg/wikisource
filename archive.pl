@@ -7,7 +7,6 @@ use Encode;
 
 use lib '.'; #for password file.
 use lib '../perl';
-use FrameWorkPW;
 use FrameworkAPI;
 use passwd;
 
