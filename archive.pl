@@ -3,15 +3,10 @@
 use strict;
 use Getopt::Long;
 use Encode;
-#use Perlwikipedia;
-
 use lib '.'; #for password file.
 use lib '../perl';
 use FrameworkAPI;
 use passwd;
-
-#use open ':raw';
-#use open ':std';
 use open ':utf8';
 
 my $debug;
@@ -48,18 +43,20 @@ sub relocate_links {
 }
 
 GetOptions('page=s'=>\$page,
-    'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
+	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level);
 
-#my $wiki = FrameWorkPW->new('en.wikisource.org');
 my $wiki = FrameworkAPI->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
 $wiki->login($::username, $::password) unless $be_anon;
 
 $wiki->{write_prefix} = $p;
 
+##############################
+# Calculate dates
+##############################
 unless (defined $archive_date) {
     my @now = localtime;
     my $m = $now[4];
@@ -82,7 +79,7 @@ unless (defined $cut_date) {
     my $y = $now[5] + 1900;
     $cut_date = $d+$m*100+$y*10000;
 }
-  
+##############################  
 
 
 my @months=qw(January February March April May June July August September October November December);
@@ -122,6 +119,10 @@ sub f() {
     }
     return undef;
 }
+
+##############################
+# Access project page
+##############################
 
 #my $buf = $wiki->get_text($page);
 my $pg = $wiki->get_page($page);
@@ -171,16 +172,34 @@ print "\n$edit_summary\n$archive_summary\n";
 
 my ($buf_open) = ('');
 
-############################################################
+
+##############################
+#print open entries for discussion page
+##############################
+seek PAGE_FH, 0,0;
+$. = 0;
+
+while (<PAGE_FH>) {
+    $buf_open .= $_, last unless @close2;
+    #FIXME CHECK - lost 1 line before, was $. < $close2...
+    $buf_open .= $_ if ($. < $close2[0][0]); 
+    shift @close2 if $. == $close2[0][1];
+}
+$buf_open .= $_ while <PAGE_FH>;
+#close PAGE_FH;
+##############################
+
+##############################
+
+
+##############################
+#print closed entries for archive page
+##############################
+
 my $archive_page = "$page/Archives";
 my $subpage = $archive_page . $anchor;
 print "$subpage\n";
 
-
-############################################################
-#print closed entries;
-#open CFH, ">", \$buf_close or die "open failed: $!";
-#binmode(CFH);
 seek PAGE_FH, 0,0;
 $. = 0;
 
@@ -238,8 +257,8 @@ while (<PAGE_FH>) {
     $buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
     shift @close if $. == $close[0][1];
 };
-#close CFH;
 
+close PAGE_FH;
 
 foreach my $heading (@majors) {
     $buf_close .= delete $merge_text{$heading} 
@@ -252,7 +271,9 @@ foreach my $c (keys %merge_text) {
 
 relocate_links $buf_close;
 
+##############################
 #rescan summary from closed page, since some won't be ours.
+##############################
 
 {
     open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
@@ -279,28 +300,7 @@ relocate_links $buf_close;
     print "new sum is:\n $archive_summary\n" if $debug;
 }
 
-
-############################################################
-
-#print open entries;
-#open OFH, ">", \$buf_open or die "open failed: $!";
-#binmode(OFH);
-seek PAGE_FH, 0,0;
-$. = 0;
-
-while (<PAGE_FH>) {
-    $buf_open .= $_, last unless @close2;
-    #print OFH if ($. < $close2[0][0]);
-#FIXME CHECK - lost 1 line before, was $. < $close2...
-    $buf_open .= $_ if ($. < $close2[0][0]); 
-    shift @close2 if $. == $close2[0][1];
-}
-#print OFH while <FH>;
-$buf_open .= $_ while <PAGE_FH>;
-#close OFH;
-
-############################################################
-close PAGE_FH;
+#open was here...
 
 ############################## test ##############################
 if (defined $ofn) {
