@@ -22,6 +22,7 @@ my $page = 'Wikisource:Scriptorium';
 my $be_anon;
 my $force;
 my $header_level = 1;
+my $annual;
 
 sub relocate_links {
     my @strip_state;
@@ -42,7 +43,7 @@ sub relocate_links {
     }
 }
 
-GetOptions('page=s'=>\$page,
+GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days,
@@ -69,7 +70,8 @@ my $archive_year = int($archive_date/100);
 my $archive_month = $archive_date % 100 + 1;
 
 print "$archive_month/$archive_year\n";
-my $anchor=sprintf "/$archive_year-%.2d", $archive_month;
+
+my ($anchor,$archive_summary);
 
 #$cut_date *= 100;
 unless (defined $cut_date) {
@@ -83,6 +85,14 @@ unless (defined $cut_date) {
 
 
 my @months=qw(January February March April May June July August September October November December);
+
+if (defined $annual) {
+    $anchor = '/'.($archive_year-$annual);
+    $archive_summary = "*[[$anchor]]<small>";
+} else {
+    $anchor=sprintf "/$archive_year-%.2d", $archive_month;
+    $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
+};
 
 my %months;
 for my $i (0..11) {
@@ -100,7 +110,6 @@ my @close;
 my $list_sep;
 my $thead;
 
-my $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
 
 sub f() {
     if ($tlevel <= 6) {
@@ -136,6 +145,7 @@ open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
 while (<PAGE_FH>) {
     /^(\=+)(.+?)\1$/ and do {
 	my $level = length($1);
+	print length($1), ": $2\n" if $debug;
 	if ($level > $header_level) {
 	    if ($level <= $tlevel) {
 		f();
@@ -144,7 +154,6 @@ while (<PAGE_FH>) {
 		$tdate = -1;
 		$thead = $2;
 	    }
-	print length($1), ": $2\n" if $debug;
 	} else {
 	    f();
 	    $tlevel = 7;
@@ -245,10 +254,11 @@ while (<PAGE_FH>) {
 	if ($level <= $header_level) {
 	    if (defined $merge_text{$2}) {
 		$buf_close .= delete $merge_text{$2};
+		$buf_close .= "\n"; #was losig this somewhere.
 		#delete $merge_text{$2};
 	    } else {
 		warn "no heading: $2" if ($have_merge_text);
-		$buf_close .= $_;
+		$buf_close .= "$_\n";
 	    }
 	}
     };
