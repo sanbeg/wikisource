@@ -10,6 +10,7 @@ use passwd;
 use open ':utf8';
 
 my $debug;
+my $verbose;
 my $cfn;
 my $ofn;
 my $do_list;
@@ -23,6 +24,7 @@ my $be_anon;
 my $force;
 my $header_level = 1;
 my $annual;
+my $skew=0;
 
 sub relocate_links {
     my @strip_state;
@@ -46,8 +48,9 @@ sub relocate_links {
 GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
-	   'prefix=s'=>\$p, 'day=i'=>\$n_days,
-	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level);
+	   'prefix=s'=>\$p, 'day=i'=>\$n_days, 'skew=i'=>\$skew,
+	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
+	   'verbose'=>\$verbose);
 
 my $wiki = FrameworkAPI->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
@@ -63,7 +66,7 @@ unless (defined $archive_date) {
     my $m = $now[4];
     my $y = $now[5] + 1900;
 
-    $archive_date = $m+$y*100;
+    $archive_date = ($m+$y*100)-$skew;
 }
 
 my $archive_year = int($archive_date/100);
@@ -87,8 +90,9 @@ unless (defined $cut_date) {
 my @months=qw(January February March April May June July August September October November December);
 
 if (defined $annual) {
-    $anchor = '/'.($archive_year-$annual);
-    $archive_summary = "*[[$anchor]]<small>";
+    my $anchort = $archive_year-$annual;
+    $anchor = '/' . $anchort;
+    $archive_summary = "*[[$anchor|$anchort]]<small>";
 } else {
     $anchor=sprintf "/$archive_year-%.2d", $archive_month;
     $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
@@ -176,7 +180,7 @@ die "nothing to archive" unless $force or @close;
 
 my $edit_summary =  "[bot] automated archival of ".@close." sections older than $n_days days";
 
-print "\n$edit_summary\n$archive_summary\n";
+print "\n$edit_summary\n$archive_summary\n" if $verbose;
 
 
 my ($buf_open) = ('');
@@ -289,7 +293,7 @@ relocate_links $buf_close;
     open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
 
     my $thead='';
-    my $fs;
+    my $fs='';
     $tlevel = 7;
 
     while (<$fh>) {
@@ -307,7 +311,7 @@ relocate_links $buf_close;
     }
     close $fh;
     $archive_summary .= "</small>\n";
-    print "new sum is:\n $archive_summary\n" if $debug;
+    print "new index is:\n $archive_summary\n" if $verbose;
 }
 
 #open was here...
