@@ -25,6 +25,8 @@ my $force;
 my $header_level = 1;
 my $annual;
 my $skew=0;
+my $do_edit_archive = 1;
+my $do_edit_index = 1;
 
 sub relocate_links {
     my @strip_state;
@@ -50,6 +52,7 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'list'=>\$do_list, 'edit!'=>\$do_edit, 'anon!'=>\$be_anon,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days, 'skew=i'=>\$skew,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
+	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
 	   'verbose'=>\$verbose);
 
 my $wiki = FrameworkAPI->new('en.wikisource.org');
@@ -138,47 +141,58 @@ sub f() {
 ##############################
 
 #my $buf = $wiki->get_text($page);
-my $pg = $wiki->get_page($page);
-my $buf = $pg->get_text;
-die "$page: missing" unless defined $buf;
+my $page_object = $wiki->get_page($page);
+if ($do_edit_archive) {
+    my $buf = $page_object->get_text;
+    die "$page: missing" unless defined $buf;
 
-open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
+    open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
 #binmode (PAGE_FH);
 
 ##scan for closed sections
-while (<PAGE_FH>) {
-    /^(\=+)(.+?)\1$/ and do {
-	my $level = length($1);
-	print length($1), ": $2\n" if $debug;
-	if ($level > $header_level) {
-	    if ($level <= $tlevel) {
+    while (<PAGE_FH>) {
+	/^(\=+)(.+?)\1$/ and do {
+	    my $level = length($1);
+	    print length($1), ": $2\n" if $debug;
+	    if ($level > $header_level) {
+		if ($level <= $tlevel) {
+		    f();
+		    $tlevel = $level;
+		    $tline = $.;
+		    $tdate = -1;
+		    $thead = $2;
+		}
+	    } else {
 		f();
-		$tlevel = $level;
-		$tline = $.;
-		$tdate = -1;
-		$thead = $2;
-	    }
-	} else {
-	    f();
-	    $tlevel = 7;
-	    #$archive_summary .=  "\n**[[$anchor#$2|$2]]";
-	    $list_sep = ':';
+		$tlevel = 7;
+		#$archive_summary .=  "\n**[[$anchor#$2|$2]]";
+		$list_sep = ':';
+	    };
+
+
+
 	};
-
-
-
+	m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
+	    and do  {
+		#print "$1 $2\n" if $debug;
+		my $nd = $3*10000+$months{$2}*100+$1;
+		$tdate = $nd if $nd > $tdate;
+	}
     };
-    m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ and do  {
-	#print "$1 $2\n" if $debug;
-	my $nd = $3*10000+$months{$2}*100+$1;
-	$tdate = $nd if $nd > $tdate;
-    }
 };
 
 my @close2 = @close;
 die "nothing to archive" unless $force or @close;
 
-my $edit_summary =  "[bot] automated archival of ".@close." sections older than $n_days days";
+my $edit_summary;
+
+if ($do_edit_archive) {
+    $edit_summary =  "[bot] automated archival of ".
+	@close.
+	" sections older than $n_days days";
+} else {
+    $edit_summary = "[bot] rewrite archive index";
+};
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
 
@@ -189,17 +203,20 @@ my ($buf_open) = ('');
 ##############################
 #print open entries for discussion page
 ##############################
-seek PAGE_FH, 0,0;
-$. = 0;
+if ($do_edit_archive) {
+    seek PAGE_FH, 0,0;
+    $. = 0;
 
-while (<PAGE_FH>) {
-    $buf_open .= $_, last unless @close2;
-    #FIXME CHECK - lost 1 line before, was $. < $close2...
-    $buf_open .= $_ if ($. < $close2[0][0]); 
-    shift @close2 if $. == $close2[0][1];
-}
-$buf_open .= $_ while <PAGE_FH>;
+    while (<PAGE_FH>) {
+	$buf_open .= $_, last unless @close2;
+	#FIXME CHECK - lost 1 line before, was $. < $close2...
+	$buf_open .= $_ if ($. < $close2[0][0]); 
+	shift @close2 if $. == $close2[0][1];
+    }
+    $buf_open .= $_ while <PAGE_FH>;
 #close PAGE_FH;
+};
+
 ##############################
 
 ##############################
@@ -209,24 +226,24 @@ $buf_open .= $_ while <PAGE_FH>;
 #print closed entries for archive page
 ##############################
 
-my $archive_page = "$page/Archives";
-my $subpage = $archive_page . $anchor;
+my $archive_index_page = "$page/Archives";
+my $subpage = $archive_index_page . $anchor;
 print "$subpage\n";
 
 seek PAGE_FH, 0,0;
 $. = 0;
 
-my $sub_pg = $wiki->get_page ($subpage);
+my $archive_subpage_object = $wiki->get_page ($subpage);
 
 my %merge_text;
 my $have_merge_text;
 my @majors;
 
 ##slurp existing entries from subpage
-if ($sub_pg->exists) {
+if ($archive_subpage_object->exists) {
     warn "$subpage exists, merging";
     $have_merge_text=1;
-    my $buf = $sub_pg->get_text;
+    my $buf = $archive_subpage_object->get_text;
     die "$page: missing" unless defined $buf;
     
     open my($fh), '<', \$buf or die "couldn't open handle: $!";
@@ -336,25 +353,27 @@ if ($do_edit) {
 
     warn "doing edit";
 
-    my $archive_pg = $wiki->get_page ($archive_page);
+    if ($do_edit_archive) {
+	$archive_subpage_object->edit($buf_close, 
+				      $edit_summary." from [[$page]]");
+	$page_object->edit($buf_open, 
+			   $edit_summary . " to [[$page/Archives$anchor]]");    
+    };
 
-    $sub_pg->edit($buf_close, $edit_summary . " from [[$page]]");
-    
-    #my $text = $archive_pg->get_text . $archive_summary;
-    #kill links to our page, so we can regen..
+    if ($do_edit_index) {
+	my $archive_index_object = $wiki->get_page ($archive_index_page);
 
-    my $text = '';
-    my $temp_text = $archive_pg->get_text;
-    foreach my $line (split "\n", $temp_text) {
-	$text .= "$line\n" unless $line =~ /^\*+\[\[$anchor/;
+	my $text = '';
+	my $temp_text = $archive_index_object->get_text;
+	foreach my $line (split "\n", $temp_text) {
+	    $text .= "$line\n" unless $line =~ /^\*+\s*\[\[$anchor/;
+	}
+	$text .= $archive_summary;
+	#print "text is:\n $text";
+	
+	$archive_index_object->edit($text,$edit_summary);
     }
-    $text .= $archive_summary;
-    #print "text is:\n $text";
-
-    $archive_pg->edit($text,$edit_summary);
-
-
-    $pg->edit($buf_open, $edit_summary . " to [[$page/Archives$anchor]]");
-
 }
+
+
 
