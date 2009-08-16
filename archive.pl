@@ -191,7 +191,7 @@ if ($do_edit_archive) {
 	@close.
 	" sections older than $n_days days";
 } else {
-    $edit_summary = "[bot] rewrite archive index";
+    $edit_summary = "[bot] rewrite archive index for $archive_month/$archive_year";
 };
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
