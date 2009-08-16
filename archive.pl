@@ -182,11 +182,12 @@ if ($do_edit_archive) {
 };
 
 my @close2 = @close;
+$force = 1 unless $do_edit_archive;
 die "nothing to archive" unless $force or @close;
 
 my $edit_summary;
 
-if ($do_edit_archive) {
+if ($do_edit_archive and @close) {
     $edit_summary =  "[bot] automated archival of ".
 	@close.
 	" sections older than $n_days days";
