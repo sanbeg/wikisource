@@ -93,9 +93,11 @@ unless (defined $cut_date) {
 my @months=qw(January February March April May June July August September October November December);
 
 if (defined $annual) {
-    my $anchort = $archive_year-$annual;
-    $anchor = '/' . $anchort;
-    $archive_summary = "*[[$anchor|$anchort]]<small>";
+    #my $anchort = $archive_year-$annual;
+    $archive_year-=$annual;
+    $archive_month='(annual)';
+    $anchor = '/' . $archive_year;
+    $archive_summary = "*[[$anchor|$archive_year]]<small>";
 } else {
     $anchor=sprintf "/$archive_year-%.2d", $archive_month;
     $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
@@ -231,8 +233,10 @@ my $archive_index_page = "$page/Archives";
 my $subpage = $archive_index_page . $anchor;
 print "$subpage\n";
 
-seek PAGE_FH, 0,0;
-$. = 0;
+if ($do_edit_archive) {
+    seek PAGE_FH, 0,0;
+    $. = 0;
+}
 
 my $archive_subpage_object = $wiki->get_page ($subpage);
 
@@ -268,29 +272,31 @@ if ($archive_subpage_object->exists) {
 my $buf_close = exists($merge_text{''}) ?
     delete $merge_text{''} : "{{archive header}}\n";
 
-while (<PAGE_FH>) {
-    last unless @close;
-    /^(\=+)\s*(.+?)\s*\1$/ and do {
-	my $level = length($1);
-	#print CFH if $level == 1;
-	if ($level <= $header_level) {
-	    if (defined $merge_text{$2}) {
-		$buf_close .= delete $merge_text{$2};
-		$buf_close .= "\n"; #was losig this somewhere.
-		#delete $merge_text{$2};
-	    } else {
-		warn "no heading: $2" if ($have_merge_text);
-		$buf_close .= "$_\n";
+if ($do_edit_archive) {
+    while (<PAGE_FH>) {
+	last unless @close;
+	/^(\=+)\s*(.+?)\s*\1$/ and do {
+	    my $level = length($1);
+	    #print CFH if $level == 1;
+	    if ($level <= $header_level) {
+		if (defined $merge_text{$2}) {
+		    $buf_close .= delete $merge_text{$2};
+		    $buf_close .= "\n"; #was losig this somewhere.
+		    #delete $merge_text{$2};
+		} else {
+		    warn "no heading: $2" if ($have_merge_text);
+		    $buf_close .= "$_\n";
+		}
 	    }
-	}
+	};
+	
+	#print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
+	$buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
+	shift @close if $. == $close[0][1];
     };
     
-    #print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
-    $buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
-    shift @close if $. == $close[0][1];
-};
-
-close PAGE_FH;
+    close PAGE_FH;
+}
 
 foreach my $heading (@majors) {
     $buf_close .= delete $merge_text{$heading} 
