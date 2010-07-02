@@ -266,6 +266,8 @@ if ($archive_subpage_object->exists) {
 	$merge_text{$major} .= $_;
     }
     close $fh;
+} elsif (not @close) {
+    die "No closed threads to index";
 }
 
 ##copy closed threads, merging in subpage.
