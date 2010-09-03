@@ -144,6 +144,8 @@ sub f() {
 
 #my $buf = $wiki->get_text($page);
 my $page_object = $wiki->get_page($page);
+my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
+
 if ($do_edit_archive) {
     my $buf = $page_object->get_text;
     die "$page: missing" unless defined $buf;
@@ -153,7 +155,7 @@ if ($do_edit_archive) {
 
 ##scan for closed sections
     while (<PAGE_FH>) {
-	/^(\=+)(.+?)\1$/ and do {
+	/$heading_re/ and do {
 	    my $level = length($1);
 	    print length($1), ": $2\n" if $debug;
 	    if ($level > $header_level) {
@@ -256,7 +258,7 @@ if ($archive_subpage_object->exists) {
     my $major = '';
 
     while (<$fh>) {
-	/^(\=+)\s*(.+?)\s*\1$/ and do {
+	/$heading_re/ and do {
 	    my $level = length($1);
 	    if ($level == 1) {
 		$major = $2;
@@ -277,7 +279,7 @@ my $buf_close = exists($merge_text{''}) ?
 if ($do_edit_archive) {
     while (<PAGE_FH>) {
 	last unless @close;
-	/^(\=+)\s*(.+?)\s*\1$/ and do {
+	/$heading_re/ and do {
 	    my $level = length($1);
 	    #print CFH if $level == 1;
 	    if ($level <= $header_level) {
@@ -323,7 +325,7 @@ relocate_links $buf_close;
     $tlevel = 7;
 
     while (<$fh>) {
-	/^(\=+)(.+?)\1$/ and do {
+	/$heading_re/ and do {
 	    my $level = length($1);
 	    if ($level <= $header_level) {
 		$fs = "\n**[[$anchor#$2|$2]]:";
