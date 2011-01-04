@@ -365,8 +365,10 @@ if ($do_edit) {
     warn "doing edit";
 
     if ($do_edit_archive) {
+	#edit the archive subpage wikisource/archives/date
 	$archive_subpage_object->edit($buf_close, 
 				      $edit_summary." from [[$page]]");
+	#once text is copied, edit the discusion wikiwource:scriptorium
 	$page_object->edit($buf_open, 
 			   $edit_summary . " to [[$page/Archives$anchor]]");    
     };
