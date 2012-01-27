@@ -149,40 +149,37 @@ my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
 if ($do_edit_archive) {
     my $buf = $page_object->get_text;
     die "$page: missing" unless defined $buf;
-
+	
     open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
-#binmode (PAGE_FH);
-
-##scan for closed sections
+	#binmode (PAGE_FH);
+	
+	##scan for closed sections
     while (<PAGE_FH>) {
-	/$heading_re/ and do {
-	    my $level = length($1);
-	    print length($1), ": $2\n" if $debug;
-	    if ($level > $header_level) {
-		if ($level <= $tlevel) {
-		    f();
-		    $tlevel = $level;
-		    $tline = $.;
-		    $tdate = -1;
-		    $thead = $2;
-		}
-	    } else {
-		f();
-		$tlevel = 7;
-		#$archive_summary .=  "\n**[[$anchor#$2|$2]]";
-		$list_sep = ':';
-	    };
-
-
-
+		/$heading_re/ and do {
+			my $level = length($1);
+			print length($1), ": $2\n" if $debug;
+			if ($level > $header_level) {
+				if ($level <= $tlevel) {
+					f();
+					$tlevel = $level;
+					$tline = $.;
+					$tdate = -1;
+					$thead = $2;
+				}
+			} else {
+				f();
+				$tlevel = 7;
+				#$archive_summary .=  "\n**[[$anchor#$2|$2]]";
+				$list_sep = ':';
+			};
+		};
+		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
+		  and do  {
+			  #print "$1 $2\n" if $debug;
+			  my $nd = $3*10000+$months{$2}*100+$1;
+			  $tdate = $nd if $nd > $tdate;
+		  }
 	};
-	m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
-	    and do  {
-		#print "$1 $2\n" if $debug;
-		my $nd = $3*10000+$months{$2}*100+$1;
-		$tdate = $nd if $nd > $tdate;
-	}
-    };
 };
 
 my @close2 = @close;
