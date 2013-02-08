@@ -4,8 +4,10 @@ use strict;
 use Getopt::Long;
 use Encode;
 use lib '.'; #for password file.
-use lib '../perl';
-use FrameworkAPI;
+
+use lib '../MediaWiki-EditFramework/lib';
+use MediaWiki::EditFramework;
+
 use passwd;
 use open ':utf8';
 
@@ -55,7 +57,7 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
 	   'verbose'=>\$verbose);
 
-my $wiki = FrameworkAPI->new('en.wikisource.org');
+my $wiki = MediaWiki::EditFramework->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
 $wiki->login($::username, $::password) unless $be_anon;
 
