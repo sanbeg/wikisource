@@ -4,8 +4,10 @@ use strict;
 use Getopt::Long;
 use Encode;
 use lib '.'; #for password file.
-use lib '../perl';
-use FrameworkAPI;
+
+use lib '../MediaWiki-EditFramework/lib';
+use MediaWiki::EditFramework;
+
 use open ':utf8';
 use feature ('switch', 'say');
 
@@ -15,7 +17,7 @@ my $do_edit;
 
 GetOptions(edit=>\$do_edit);
 
-my $wiki = FrameworkAPI->new('en.wikisource.org');
+my $wiki = MediaWiki::EditFramework->new('en.wikisource.org');
 my $page_object = $wiki->get_page($page);
 my $buf = $page_object->get_text;
 

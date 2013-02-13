@@ -118,7 +118,6 @@ my $tline;
 my $tdate;
 
 my @close;
-my $list_sep;
 my $thead;
 
 
@@ -133,7 +132,6 @@ sub f() {
 	if ($tdate <= $cut_date) {
 	    push @close, [$tline, $. -1];
 	    #$archive_summary .= "$list_sep $thead";
-	    $list_sep = '|';
 	    return 1;
 	}
     }
@@ -172,7 +170,6 @@ if ($do_edit_archive) {
 				f();
 				$tlevel = 7;
 				#$archive_summary .=  "\n**[[$anchor#$2|$2]]";
-				$list_sep = ':';
 			};
 		};
 		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
