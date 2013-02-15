@@ -317,7 +317,7 @@ relocate_links $buf_close;
     open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
 
     my $thead='';
-    my $fs='';
+    my $fs=':';
     $tlevel = 7;
 
     while (<$fh>) {
