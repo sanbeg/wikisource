@@ -28,4 +28,9 @@ cmp_ok($jan, '<', $date, 'offset < date');
 cmp_ok($date, '>', $jan, 'date > offset');
 cmp_ok($date, '==', $date, 'date > offset');
 
+my $nov = Date->new(months=>3);
+is($nov->year, 2012, 'got year');
+is($nov->month, 11, 'got month');
+is($nov->month_name, 'November', 'got month name');
+
 done_testing;

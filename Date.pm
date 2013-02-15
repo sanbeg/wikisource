@@ -1,4 +1,5 @@
 package Date;
+use strict;
 
 my @months=qw(January February March April May June July August September October November December);
 
@@ -8,11 +9,18 @@ sub new {
 
   my $date = $opt{date};
   unless (defined $date) {
-warn "days is $opt{days}";
     my @now = localtime(time()-60*60*24*$opt{days});
     my $d = $now[3];
     my $m = $now[4];
     my $y = $now[5] + 1900;
+
+    if ($opt{months}) {
+      $m -= $opt{months};
+      while ($m < 0) {
+	-- $y;
+	$m += 12;
+      }
+    };
     $date = $d+$m*100+$y*10_000;
   }
 
