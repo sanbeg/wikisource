@@ -7,7 +7,7 @@ use lib '.'; #for password file.
 
 use lib '../MediaWiki-EditFramework/lib';
 use MediaWiki::EditFramework;
-
+use Date;
 use passwd;
 use open ':utf8';
 
@@ -18,7 +18,6 @@ my $ofn;
 my $do_list;
 my $do_edit;
 my $cut_date;
-my $archive_date;
 my $n_days = 30;
 my $p='';
 my $page = 'Wikisource:Scriptorium';
@@ -66,29 +65,16 @@ $wiki->{write_prefix} = $p;
 ##############################
 # Calculate dates
 ##############################
-unless (defined $archive_date) {
-    my @now = localtime;
-    my $m = $now[4];
-    my $y = $now[5] + 1900;
-
-    $archive_date = ($m+$y*100)-$skew;
-}
-
-my $archive_year = int($archive_date/100);
-my $archive_month = $archive_date % 100 + 1;
+my $archive_date = Date->new(months=>$skew);
+my $archive_year = $archive_date->year;
+my $archive_month = $archive_date->month;
 
 print "$archive_month/$archive_year\n";
 
 my ($anchor,$archive_summary);
 
 #$cut_date *= 100;
-unless (defined $cut_date) {
-    my @now = localtime(time-60*60*24*$n_days);
-    my $d = $now[3];
-    my $m = $now[4];
-    my $y = $now[5] + 1900;
-    $cut_date = $d+$m*100+$y*10000;
-}
+$cut_date=Date->new(date=>$cut_date, days=>$n_days);
 ##############################  
 
 
@@ -124,9 +110,9 @@ my $thead;
 sub f() {
     if ($tlevel <= 6) {
 	if ($debug){
-	    my $month = $months[int($tdate/100)%100];
-	    my $day = $tdate % 100;
-	    my $year = int($tdate / 10000);
+	    my $month = $tdate->month_name;
+	    my $day = $tdate->day;
+	    my $year = $tdate->year;
 	    print "$tlevel . $tline : $month $day $year\n";
 	}
 	if ($tdate <= $cut_date) {
@@ -163,7 +149,7 @@ if ($do_edit_archive) {
 					f();
 					$tlevel = $level;
 					$tline = $.;
-					$tdate = -1;
+					$tdate = Date->new(date=>-1);
 					$thead = $2;
 				}
 			} else {
@@ -175,7 +161,7 @@ if ($do_edit_archive) {
 		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
 		  and do  {
 			  #print "$1 $2\n" if $debug;
-			  my $nd = $3*10000+$months{$2}*100+$1;
+			  my $nd=Date->new(date=>{y=>$3,m=>$months{$2},d=>$1});
 			  $tdate = $nd if $nd > $tdate;
 		  }
 	};

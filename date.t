@@ -17,6 +17,7 @@ is($date->{date}, 20130113, 'got fake time');
 is($date->year, 2013, 'got year');
 is($date->month, 2, 'got month');
 is($date->month_name, 'February', 'got month name');
+is($date->day, 13, 'got day');
 
 my $jan = Date->new(days=>30);
 is($jan->{date}, 20130014, 'got offset fake time');

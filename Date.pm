@@ -3,13 +3,38 @@ use strict;
 
 my @months=qw(January February March April May June July August September October November December);
 
+sub set {
+  my $self = shift;
+  my $date = shift;
+
+  if (ref $date) {
+    $self->{date} = $date->{d}+$date->{m}*100+$date->{y}*10_000;
+  } else {
+    $self->{date} = $date ;
+  }
+}
+
+sub unset {
+  my $self = shift;
+  if (ref $self) {
+    $self->{date} = 0;
+  } else {
+    $self = bless {date=>0}, $self;
+  };
+  return $self;
+}
+
 sub new {
   my $class = shift;
   my %opt = @_;
 
-  my $date = $opt{date};
-  unless (defined $date) {
-    my @now = localtime(time()-60*60*24*$opt{days});
+  my %self;
+
+  if (defined $opt{date}) {
+    set(\%self, $opt{date});
+  } else {
+    my $delta = (defined($opt{days})?$opt{days}:0) * 60*60*24;
+    my @now = localtime(time()-$delta );
     my $d = $now[3];
     my $m = $now[4];
     my $y = $now[5] + 1900;
@@ -21,17 +46,20 @@ sub new {
 	$m += 12;
       }
     };
-    $date = $d+$m*100+$y*10_000;
+    $self{date} = $d+$m*100+$y*10_000;
   }
 
-  bless { date => $date }, $class;
+  bless \%self, $class;
 };
 
-sub year {
-  int( $_[0]{date} / 10_000 );
+sub year  {
+  int( $_[0]{date} / 10_000 )
 };
 sub month {
-  int(($_[0]{date} % 10_000) / 100)+1;
+  int(($_[0]{date} % 10_000) / 100)+1
+};
+sub day {
+  $_[0]{date} % 100
 };
 
 sub month_name {
@@ -42,7 +70,7 @@ sub month_name {
 sub compare {
   my ($self, $other, $reverse) = @_;
   my $rv = $self->{date} <=> $other->{date};
-  $rv *= 1 if $reverse;
+  $rv *= -1 if $reverse;
   return $rv;
 };
 
