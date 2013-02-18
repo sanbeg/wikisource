@@ -1,20 +1,23 @@
 package PageDate;
+use strict;
 use Date;
-our @ISA = 'Date';
 
-
-sub set_annual {
-    my $self = shift;
-    $self->{annual} = shift;
+sub new {
+    my $class = shift;
+    my %opts = @_;
+    my %date_opts;
+    %date_opts = %{$opts{date}} if defined $opts{date};
+    $date_opts{years} = $opts{annual} if $opts{annual};
+    bless {date=>Date->new(%date_opts), annual=>$opts{annual}}, $class;
 }
+
 
 sub page {
     my $self = shift;
     if (defined $self->{annual}) {
-	my $archive_year = $self->year - $self->{annual};
-	return $archive_year;
+	return $self->{date}->year;
     } else {
-	return sprintf "%d-%.2d", $self->year, $self->month;
+	return sprintf "%d-%.2d", $self->{date}->year, $self->{date}->month;
     }
 }
 
@@ -23,9 +26,10 @@ sub link {
     my $self = shift;
     my $anchor = '/' . $self->page;
     if (defined $self->{annual}) {
-	$archive_summary = "[[$anchor|".($self->year-$self->{annual}) ."]]";
+	return "[[$anchor|". $self->{date}->year ."]]";
     } else {
-	$archive_summary = "[[$anchor|". $self->month_name.   "]]";
+	return "[[$anchor|". $self->{date}->month_name.   "]]";
     }
 }
 
+1;
