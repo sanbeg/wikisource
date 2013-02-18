@@ -34,4 +34,10 @@ is($nov->year, 2012, 'got year');
 is($nov->month, 11, 'got month');
 is($nov->month_name, 'November', 'got month name');
 
+my $prev_year = Date->new(years=>1);
+is($prev_year->year, 2012, 'got prev year');
+is($prev_year->month, 2, 'got month');
+is($prev_year->month_name, 'February', 'got month name');
+is($prev_year->day, 13, 'got day');
+
 done_testing;
