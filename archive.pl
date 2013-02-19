@@ -8,6 +8,7 @@ use lib '.'; #for password file.
 use lib '../MediaWiki-EditFramework/lib';
 use MediaWiki::EditFramework;
 use Date;
+use PageDate;
 use passwd;
 use open ':utf8';
 
@@ -65,31 +66,15 @@ $wiki->{write_prefix} = $p;
 ##############################
 # Calculate dates
 ##############################
-my $archive_date = Date->new(months=>$skew);
-my $archive_year = $archive_date->year;
-my $archive_month = $archive_date->month;
+my $archive_date = PageDate->new(annual=>$annual, date=>{months=>$skew});
+print $archive_date->page, "\n";
+my $anchor = $archive_date->anchor;
+my $archive_summary = '*' . $archive_date->link . '<small>';
 
-print "$archive_month/$archive_year\n";
-
-my ($anchor,$archive_summary);
-
-#$cut_date *= 100;
 $cut_date=Date->new(date=>$cut_date, days=>$n_days);
 ##############################  
 
-
 my @months=qw(January February March April May June July August September October November December);
-
-if (defined $annual) {
-    #my $anchort = $archive_year-$annual;
-    $archive_year-=$annual;
-    $archive_month='(annual)';
-    $anchor = '/' . $archive_year;
-    $archive_summary = "*[[$anchor|$archive_year]]<small>";
-} else {
-    $anchor=sprintf "/$archive_year-%.2d", $archive_month;
-    $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
-};
 
 my %months;
 for my $i (0..11) {
@@ -178,7 +163,7 @@ if ($do_edit_archive and @close) {
 	@close.
 	" sections older than $n_days days";
 } else {
-    $edit_summary = "[bot] rewrite archive index for $archive_month/$archive_year";
+    $edit_summary = "[bot] rewrite archive index for " . $archive_date->page;
 };
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
@@ -369,6 +354,3 @@ if ($do_edit) {
 	$archive_index_object->edit($text,$edit_summary);
     }
 }
-
-
-

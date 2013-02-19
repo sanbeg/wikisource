@@ -21,6 +21,10 @@ sub page {
     }
 }
 
+sub anchor {
+    my $self = shift;
+    return '/' . $self->page;
+}
 
 sub link {
     my $self = shift;
