@@ -46,6 +46,9 @@ sub new {
 	$m += 12;
       }
     };
+    if ($opt{years}) {
+	$y -= $opt{years};
+    };
     $self{date} = $d+$m*100+$y*10_000;
   }
 
