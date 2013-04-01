@@ -8,6 +8,7 @@ use lib '.'; #for password file.
 use lib '../MediaWiki-EditFramework/lib';
 use MediaWiki::EditFramework;
 use Date;
+use Link;
 use passwd;
 use open ':utf8';
 
@@ -29,24 +30,6 @@ my $skew=0;
 my $do_edit_archive = 1;
 my $do_edit_index = 1;
 
-sub relocate_links {
-    my @strip_state;
-    for (@_) {
-	my $strip_text=sub( $ ) {
-	    push (@strip_state, $_[0]);
-	
-	    return "<$#strip_state>";
-	};
-
-	next unless m{\Q[[/};
-
-	s{(<(nowiki|pre)\s*>(.*?)</\2\s*>|<[0-9]+>)}{$strip_text->($1)}ge;
-	s{\Q[[/}{[[$page/}g;
-
-	s{<([0-9]+)>}{$strip_state[$1]}ge;
-	@strip_state = ();
-    }
-}
 
 GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
@@ -293,12 +276,12 @@ foreach my $c (keys %merge_text) {
 };
 
 
-relocate_links $buf_close;
+Link::relocate ($page,$buf_close);
 
 ##############################
 #rescan summary from closed page, since some won't be ours.
 ##############################
-
+my @all_closed_sections;
 {
     open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
 
@@ -316,6 +299,7 @@ relocate_links $buf_close;
 		$archive_summary .= $fs . $2;
 		$fs = '|';
 		$tlevel = $level;
+		push @all_closed_sections, $2;
 	    }
 	};
     }
@@ -323,6 +307,11 @@ relocate_links $buf_close;
     $archive_summary .= "</small>\n";
     print "new index is:\n $archive_summary\n" if $verbose;
 }
+
+Link::relocate_src($subpage,\@all_closed_sections,$buf_open);
+open TMP1, '>rel-new.txt';
+print TMP1 $buf_open;
+close TMP1;
 
 #open was here...
 
