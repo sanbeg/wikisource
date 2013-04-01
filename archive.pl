@@ -309,9 +309,6 @@ my @all_closed_sections;
 }
 
 Link::relocate_src($subpage,\@all_closed_sections,$buf_open);
-open TMP1, '>rel-new.txt';
-print TMP1 $buf_open;
-close TMP1;
 
 #open was here...
 
