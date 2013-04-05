@@ -135,7 +135,6 @@ if ($do_edit_archive) {
 	};
 };
 
-my @close2 = @close;
 $force = 1 unless $do_edit_archive;
 die "nothing to archive" unless $force or @close;
 
@@ -151,14 +150,12 @@ if ($do_edit_archive and @close) {
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
 
-
-my ($buf_open) = ('');
-
-
 ##############################
 #print open entries for discussion page
 ##############################
+my $buf_open = '';
 if ($do_edit_archive) {
+    my @close2 = @close;
     seek PAGE_FH, 0,0;
     $. = 0;
 
@@ -171,11 +168,6 @@ if ($do_edit_archive) {
     $buf_open .= $_ while <PAGE_FH>;
 #close PAGE_FH;
 };
-
-##############################
-
-##############################
-
 
 ##############################
 #print closed entries for archive page
