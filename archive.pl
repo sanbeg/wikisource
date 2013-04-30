@@ -30,7 +30,7 @@ my $annual;
 my $skew=0;
 my $do_edit_archive = 1;
 my $do_edit_index = 1;
-
+my $dump_dir;
 
 GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
@@ -38,13 +38,14 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days, 'skew=i'=>\$skew,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
 	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
-	   'verbose'=>\$verbose);
+	   'verbose'=>\$verbose, 'dump=s'=>\$dump_dir);
 
 my $wiki = MediaWiki::EditFramework->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
 $wiki->login($::username, $::password) unless $be_anon;
 
 $wiki->{write_prefix} = $p;
+$wiki->{text_dump_dir} = $dump_dir;
 
 ##############################
 # Calculate dates
@@ -153,21 +154,26 @@ print "\n$edit_summary\n$archive_summary\n" if $verbose;
 ##############################
 #print open entries for discussion page
 ##############################
-my $buf_open = '';
-if ($do_edit_archive) {
-    my @close2 = @close;
-    seek PAGE_FH, 0,0;
-    $. = 0;
 
-    while (<PAGE_FH>) {
-	$buf_open .= $_, last unless @close2;
-	#FIXME CHECK - lost 1 line before, was $. < $close2...
-	$buf_open .= $_ if ($. < $close2[0][0]); 
-	shift @close2 if $. == $close2[0][1];
-    }
-    $buf_open .= $_ while <PAGE_FH>;
-#close PAGE_FH;
-};
+sub extract_open_sections {
+  my $closed = shift;
+  my $buf_open = '';
+
+  my @close2 = @$closed;
+  seek PAGE_FH, 0,0;
+  $. = 0;
+  
+  while (<PAGE_FH>) {
+    $buf_open .= $_, last unless @close2;
+    #FIXME CHECK - lost 1 line before, was $. < $close2...
+    $buf_open .= $_ if ($. < $close2[0][0]); 
+    shift @close2 if $. == $close2[0][1];
+  }
+  $buf_open .= $_ while <PAGE_FH>;
+  return $buf_open;
+}
+
+my $buf_open = $do_edit_archive ? extract_open_sections( \@close ) : '';
 
 ##############################
 #print closed entries for archive page
