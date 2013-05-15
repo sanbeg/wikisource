@@ -100,16 +100,17 @@ sub f() {
 #my $buf = $wiki->get_text($page);
 my $page_object = $wiki->get_page($page);
 my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
+my $page_fh;
 
 if ($do_edit_archive) {
     my $buf = $page_object->get_text;
     die "$page: missing" unless defined $buf;
 	
-    open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
-	#binmode (PAGE_FH);
+    open $page_fh, '<', \$buf or die "couldn't open handle: $!";
+	#binmode ($page_fh);
 	
 	##scan for closed sections
-    while (<PAGE_FH>) {
+    while (<$page_fh>) {
 		/$heading_re/ and do {
 			my $level = length($1);
 			print length($1), ": $2\n" if $debug;
@@ -156,24 +157,25 @@ print "\n$edit_summary\n$archive_summary\n" if $verbose;
 ##############################
 
 sub extract_open_sections {
+  my $page_fh = shift;
   my $closed = shift;
   my $buf_open = '';
 
   my @close2 = @$closed;
-  seek PAGE_FH, 0,0;
+  seek $page_fh, 0,0;
   $. = 0;
   
-  while (<PAGE_FH>) {
+  while (<$page_fh>) {
     $buf_open .= $_, last unless @close2;
     #FIXME CHECK - lost 1 line before, was $. < $close2...
     $buf_open .= $_ if ($. < $close2[0][0]); 
     shift @close2 if $. == $close2[0][1];
   }
-  $buf_open .= $_ while <PAGE_FH>;
+  $buf_open .= $_ while <$page_fh>;
   return $buf_open;
 }
 
-my $buf_open = $do_edit_archive ? extract_open_sections( \@close ) : '';
+my $buf_open = $do_edit_archive ? extract_open_sections( $page_fh, \@close ) : '';
 
 ##############################
 #print closed entries for archive page
@@ -184,7 +186,7 @@ my $subpage = $archive_index_page . $anchor;
 print "$subpage\n";
 
 if ($do_edit_archive) {
-    seek PAGE_FH, 0,0;
+    seek $page_fh, 0,0;
     $. = 0;
 }
 
@@ -225,7 +227,7 @@ my $buf_close = exists($merge_text{''}) ?
     delete $merge_text{''} : "{{archive header}}\n";
 
 if ($do_edit_archive) {
-    while (<PAGE_FH>) {
+    while (<$page_fh>) {
 	last unless @close;
 	/$heading_re/ and do {
 	    my $level = length($1);
@@ -247,7 +249,7 @@ if ($do_edit_archive) {
 	shift @close if $. == $close[0][1];
     };
     
-    close PAGE_FH;
+    close $page_fh;
 }
 
 foreach my $heading (@majors) {
