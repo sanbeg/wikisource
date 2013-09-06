@@ -102,14 +102,8 @@ my $page_object = $wiki->get_page($page);
 my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
 my $page_fh;
 
-if ($do_edit_archive) {
-    my $buf = $page_object->get_text;
-    die "$page: missing" unless defined $buf;
-	
-    open $page_fh, '<', \$buf or die "couldn't open handle: $!";
-	#binmode ($page_fh);
-	
-	##scan for closed sections
+sub find_closed_sections {
+  ##scan for closed sections
     while (<$page_fh>) {
 		/$heading_re/ and do {
 			my $level = length($1);
@@ -135,6 +129,16 @@ if ($do_edit_archive) {
 			  $tdate = $nd if $nd > $tdate;
 		  }
 	};
+
+}
+
+if ($do_edit_archive) {
+    my $buf = $page_object->get_text;
+    die "$page: missing" unless defined $buf;
+	
+    open $page_fh, '<', \$buf or die "couldn't open handle: $!";
+	#binmode ($page_fh);
+    find_closed_sections;
 };
 
 $force = 1 unless $do_edit_archive;
