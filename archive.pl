@@ -31,6 +31,7 @@ my $skew=0;
 my $do_edit_archive = 1;
 my $do_edit_index = 1;
 my $dump_dir;
+my ($username, $password);
 
 GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
@@ -38,11 +39,15 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days, 'skew=i'=>\$skew,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
 	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
-	   'verbose'=>\$verbose, 'dump=s'=>\$dump_dir);
+	   'verbose'=>\$verbose, 'dump=s'=>\$dump_dir,
+	  'username=s'=>\$username, 'password=s'=>\$password);
+
+$username //= $::username;
+$password //= $::password;
 
 my $wiki = MediaWiki::EditFramework->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
-$wiki->login($::username, $::password) unless $be_anon;
+$wiki->login($username, $password) unless $be_anon;
 
 $wiki->{write_prefix} = $p;
 $wiki->{text_dump_dir} = $dump_dir;
@@ -214,7 +219,7 @@ if ($archive_subpage_object->exists) {
     while (<$fh>) {
 	/$heading_re/ and do {
 	    my $level = length($1);
-	    if ($level == 1) {
+	    if ($level <= $header_level) {
 		$major = $2;
 		push @majors, $major;
 	    }
@@ -247,12 +252,10 @@ if ($do_edit_archive) {
 		}
 	    }
 	};
-	
 	#print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
 	$buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
 	shift @close if $. == $close[0][1];
     };
-    
     close $page_fh;
 }
 
