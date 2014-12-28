@@ -1,5 +1,5 @@
 use Test::More;
-use lib '.';
+use lib 'lib';
 
 BEGIN {
   *CORE::GLOBAL::time = \&fake_time;

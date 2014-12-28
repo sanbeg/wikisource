@@ -4,7 +4,7 @@ use strict;
 use Getopt::Long;
 use Encode;
 use lib '.'; #for password file.
-
+use lib 'lib';
 use lib '../MediaWiki-EditFramework/lib';
 use MediaWiki::EditFramework;
 use Date;

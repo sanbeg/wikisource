@@ -1,5 +1,5 @@
 use Test::More;
-use lib '.';
+use lib 'lib';
 use Link;
 
 my $page = 'Example';
