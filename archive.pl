@@ -19,6 +19,7 @@ my $cfn;
 my $ofn;
 my $do_list;
 my $do_edit;
+my $do_bot = 1;
 my $cut_date;
 my $n_days = 30;
 my $p='';
@@ -40,7 +41,8 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
 	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
 	   'verbose'=>\$verbose, 'dump=s'=>\$dump_dir,
-	  'username=s'=>\$username, 'password=s'=>\$password);
+	   'bot!' => \$do_bot,
+	   'username=s'=>\$username, 'password=s'=>\$password);
 
 $username //= $::username;
 $password //= $::password;
@@ -140,7 +142,6 @@ sub find_closed_sections {
 if ($do_edit_archive) {
     my $buf = $page_object->get_text;
     die "$page: missing" unless defined $buf;
-	
     open $page_fh, '<', \$buf or die "couldn't open handle: $!";
 	#binmode ($page_fh);
     find_closed_sections;
@@ -152,11 +153,16 @@ die "nothing to archive" unless $force or @close;
 my $edit_summary;
 
 if ($do_edit_archive and @close) {
-    $edit_summary =  "[bot] automated archival of ".
-	@close.
-	" sections older than $n_days days";
+  my $bot_label = $do_bot ? '[bot] automated ' : '';
+  $edit_summary =
+    $bot_label     .
+    "archival of " .
+    @close         .
+    " sections older than $n_days days";
 } else {
-    $edit_summary = "[bot] rewrite archive index for " . $archive_date->page;
+  my $bot_label = $do_bot ? '[bot] ' : '';
+  $edit_summary = "${bot_label}rewrite archive index for "
+    . $archive_date->page;
 };
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
