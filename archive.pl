@@ -7,7 +7,9 @@ use lib '.'; #for password file.
 
 use lib '../MediaWiki-EditFramework/lib';
 use MediaWiki::EditFramework;
-
+use Date;
+use Link;
+use PageDate;
 use passwd;
 use open ':utf8';
 
@@ -18,7 +20,6 @@ my $ofn;
 my $do_list;
 my $do_edit;
 my $cut_date;
-my $archive_date;
 my $n_days = 30;
 my $p='';
 my $page = 'Wikisource:Scriptorium';
@@ -29,25 +30,8 @@ my $annual;
 my $skew=0;
 my $do_edit_archive = 1;
 my $do_edit_index = 1;
-
-sub relocate_links {
-    my @strip_state;
-    for (@_) {
-	my $strip_text=sub( $ ) {
-	    push (@strip_state, $_[0]);
-	
-	    return "<$#strip_state>";
-	};
-
-	next unless m{\Q[[/};
-
-	s{(<(nowiki|pre)\s*>(.*?)</\2\s*>|<[0-9]+>)}{$strip_text->($1)}ge;
-	s{\Q[[/}{[[$page/}g;
-
-	s{<([0-9]+)>}{$strip_state[$1]}ge;
-	@strip_state = ();
-    }
-}
+my $dump_dir;
+my ($username, $password);
 
 GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'debug'=>\$debug, 'open=s'=>\$ofn, 'close=s'=>\$cfn, 
@@ -55,55 +39,31 @@ GetOptions('page=s'=>\$page, 'annual=i'=>\$annual,
 	   'prefix=s'=>\$p, 'day=i'=>\$n_days, 'skew=i'=>\$skew,
 	   'cut=i'=>\$cut_date,'force!'=>\$force,'head=i'=>\$header_level,
 	   'archive!'=>\$do_edit_archive, 'index!'=>\$do_edit_index,
-	   'verbose'=>\$verbose);
+	   'verbose'=>\$verbose, 'dump=s'=>\$dump_dir,
+	  'username=s'=>\$username, 'password=s'=>\$password);
+
+$username //= $::username;
+$password //= $::password;
 
 my $wiki = MediaWiki::EditFramework->new('en.wikisource.org');
 $be_anon = 1 unless $do_edit;
-$wiki->login($::username, $::password) unless $be_anon;
+$wiki->login($username, $password) unless $be_anon;
 
 $wiki->{write_prefix} = $p;
+$wiki->{text_dump_dir} = $dump_dir;
 
 ##############################
 # Calculate dates
 ##############################
-unless (defined $archive_date) {
-    my @now = localtime;
-    my $m = $now[4];
-    my $y = $now[5] + 1900;
+my $archive_date = PageDate->new(annual=>$annual, date=>{months=>$skew});
+print $archive_date->page, "\n";
+my $anchor = $archive_date->anchor;
+my $archive_summary = '*' . $archive_date->link . '<small>';
 
-    $archive_date = ($m+$y*100)-$skew;
-}
-
-my $archive_year = int($archive_date/100);
-my $archive_month = $archive_date % 100 + 1;
-
-print "$archive_month/$archive_year\n";
-
-my ($anchor,$archive_summary);
-
-#$cut_date *= 100;
-unless (defined $cut_date) {
-    my @now = localtime(time-60*60*24*$n_days);
-    my $d = $now[3];
-    my $m = $now[4];
-    my $y = $now[5] + 1900;
-    $cut_date = $d+$m*100+$y*10000;
-}
+$cut_date=Date->new(date=>$cut_date, days=>$n_days);
 ##############################  
 
-
 my @months=qw(January February March April May June July August September October November December);
-
-if (defined $annual) {
-    #my $anchort = $archive_year-$annual;
-    $archive_year-=$annual;
-    $archive_month='(annual)';
-    $anchor = '/' . $archive_year;
-    $archive_summary = "*[[$anchor|$archive_year]]<small>";
-} else {
-    $anchor=sprintf "/$archive_year-%.2d", $archive_month;
-    $archive_summary = "*[[$anchor|$months[$archive_month-1]]]<small>";
-};
 
 my %months;
 for my $i (0..11) {
@@ -124,9 +84,9 @@ my $thead;
 sub f() {
     if ($tlevel <= 6) {
 	if ($debug){
-	    my $month = $months[int($tdate/100)%100];
-	    my $day = $tdate % 100;
-	    my $year = int($tdate / 10000);
+	    my $month = $tdate->month_name;
+	    my $day = $tdate->day;
+	    my $year = $tdate->year;
 	    print "$tlevel . $tline : $month $day $year\n";
 	}
 	if ($tdate <= $cut_date) {
@@ -145,16 +105,11 @@ sub f() {
 #my $buf = $wiki->get_text($page);
 my $page_object = $wiki->get_page($page);
 my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
+my $page_fh;
 
-if ($do_edit_archive) {
-    my $buf = $page_object->get_text;
-    die "$page: missing" unless defined $buf;
-	
-    open PAGE_FH, '<', \$buf or die "couldn't open handle: $!";
-	#binmode (PAGE_FH);
-	
-	##scan for closed sections
-    while (<PAGE_FH>) {
+sub find_closed_sections {
+  ##scan for closed sections
+    while (<$page_fh>) {
 		/$heading_re/ and do {
 			my $level = length($1);
 			print length($1), ": $2\n" if $debug;
@@ -163,7 +118,7 @@ if ($do_edit_archive) {
 					f();
 					$tlevel = $level;
 					$tline = $.;
-					$tdate = -1;
+					$tdate = Date->new(date=>-1);
 					$thead = $2;
 				}
 			} else {
@@ -175,13 +130,22 @@ if ($do_edit_archive) {
 		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
 		  and do  {
 			  #print "$1 $2\n" if $debug;
-			  my $nd = $3*10000+$months{$2}*100+$1;
+			  my $nd=Date->new(date=>{y=>$3,m=>$months{$2},d=>$1});
 			  $tdate = $nd if $nd > $tdate;
 		  }
 	};
+
+}
+
+if ($do_edit_archive) {
+    my $buf = $page_object->get_text;
+    die "$page: missing" unless defined $buf;
+	
+    open $page_fh, '<', \$buf or die "couldn't open handle: $!";
+	#binmode ($page_fh);
+    find_closed_sections;
 };
 
-my @close2 = @close;
 $force = 1 unless $do_edit_archive;
 die "nothing to archive" unless $force or @close;
 
@@ -192,36 +156,35 @@ if ($do_edit_archive and @close) {
 	@close.
 	" sections older than $n_days days";
 } else {
-    $edit_summary = "[bot] rewrite archive index for $archive_month/$archive_year";
+    $edit_summary = "[bot] rewrite archive index for " . $archive_date->page;
 };
 
 print "\n$edit_summary\n$archive_summary\n" if $verbose;
 
-
-my ($buf_open) = ('');
-
-
 ##############################
 #print open entries for discussion page
 ##############################
-if ($do_edit_archive) {
-    seek PAGE_FH, 0,0;
-    $. = 0;
 
-    while (<PAGE_FH>) {
-	$buf_open .= $_, last unless @close2;
-	#FIXME CHECK - lost 1 line before, was $. < $close2...
-	$buf_open .= $_ if ($. < $close2[0][0]); 
-	shift @close2 if $. == $close2[0][1];
-    }
-    $buf_open .= $_ while <PAGE_FH>;
-#close PAGE_FH;
-};
+sub extract_open_sections {
+  my $page_fh = shift;
+  my $closed = shift;
+  my $buf_open = '';
 
-##############################
+  my @close2 = @$closed;
+  seek $page_fh, 0,0;
+  $. = 0;
+  
+  while (<$page_fh>) {
+    $buf_open .= $_, last unless @close2;
+    #FIXME CHECK - lost 1 line before, was $. < $close2...
+    $buf_open .= $_ if ($. < $close2[0][0]); 
+    shift @close2 if $. == $close2[0][1];
+  }
+  $buf_open .= $_ while <$page_fh>;
+  return $buf_open;
+}
 
-##############################
-
+my $buf_open = $do_edit_archive ? extract_open_sections( $page_fh, \@close ) : '';
 
 ##############################
 #print closed entries for archive page
@@ -232,7 +195,7 @@ my $subpage = $archive_index_page . $anchor;
 print "$subpage\n";
 
 if ($do_edit_archive) {
-    seek PAGE_FH, 0,0;
+    seek $page_fh, 0,0;
     $. = 0;
 }
 
@@ -256,7 +219,7 @@ if ($archive_subpage_object->exists) {
     while (<$fh>) {
 	/$heading_re/ and do {
 	    my $level = length($1);
-	    if ($level == 1) {
+	    if ($level <= $header_level) {
 		$major = $2;
 		push @majors, $major;
 	    }
@@ -273,7 +236,7 @@ my $buf_close = exists($merge_text{''}) ?
     delete $merge_text{''} : "{{archive header}}\n";
 
 if ($do_edit_archive) {
-    while (<PAGE_FH>) {
+    while (<$page_fh>) {
 	last unless @close;
 	/$heading_re/ and do {
 	    my $level = length($1);
@@ -289,13 +252,11 @@ if ($do_edit_archive) {
 		}
 	    }
 	};
-	
 	#print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
 	$buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
 	shift @close if $. == $close[0][1];
     };
-    
-    close PAGE_FH;
+    close $page_fh;
 }
 
 foreach my $heading (@majors) {
@@ -307,12 +268,12 @@ foreach my $c (keys %merge_text) {
 };
 
 
-relocate_links $buf_close;
+Link::relocate ($page,$buf_close);
 
 ##############################
 #rescan summary from closed page, since some won't be ours.
 ##############################
-
+my @all_closed_sections;
 {
     open my($fh), '<', \$buf_close or die "couldn't open handle: $!";
 
@@ -330,6 +291,7 @@ relocate_links $buf_close;
 		$archive_summary .= $fs . $2;
 		$fs = '|';
 		$tlevel = $level;
+		push @all_closed_sections, $2;
 	    }
 	};
     }
@@ -337,6 +299,8 @@ relocate_links $buf_close;
     $archive_summary .= "</small>\n";
     print "new index is:\n $archive_summary\n" if $verbose;
 }
+
+Link::relocate_src($subpage,\@all_closed_sections,$buf_open);
 
 #open was here...
 
@@ -383,6 +347,3 @@ if ($do_edit) {
 	$archive_index_object->edit($text,$edit_summary);
     }
 }
-
-
-
