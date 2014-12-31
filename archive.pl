@@ -10,6 +10,7 @@ use MediaWiki::EditFramework;
 use Date;
 use Link;
 use PageDate;
+use ArchivePageText;
 use passwd;
 use open ':utf8';
 
@@ -196,74 +197,24 @@ if ($do_edit_archive) {
 }
 
 my $archive_subpage_object = $wiki->get_page ($subpage);
-
-my %merge_text;
-my $have_merge_text;
-my @majors;
+my $archive_page_content;
 
 ##slurp existing entries from subpage
 if ($archive_subpage_object->exists) {
     warn "$subpage exists, merging";
-    $have_merge_text=1;
-    my $buf = $archive_subpage_object->get_text;
-    die "$page: missing" unless defined $buf;
-    
-    open my($fh), '<', \$buf or die "couldn't open handle: $!";
-
-    my $major = '';
-
-    while (<$fh>) {
-	/$heading_re/ and do {
-	    my $level = length($1);
-	    if ($level <= $header_level) {
-		$major = $2;
-		push @majors, $major;
-	    }
-	};
-	$merge_text{$major} .= $_;
-    }
-    close $fh;
-} elsif (not @close) {
+    $archive_page_content = ArchivePageText->new($archive_subpage_object->get_text);
+} elsif (@close) {
+    $archive_page_content = ArchivePageText->new("{{archive header}}\n");
+} else {
     die "No closed threads to index";
 }
 
 ##copy closed threads, merging in subpage.
-my $buf_close = exists($merge_text{''}) ?
-    delete $merge_text{''} : "{{archive header}}\n";
-
 if ($do_edit_archive) {
-    while (<$page_fh>) {
-	last unless @close;
-	/$heading_re/ and do {
-	    my $level = length($1);
-	    #print CFH if $level == 1;
-	    if ($level <= $header_level) {
-		if (defined $merge_text{$2}) {
-		    $buf_close .= delete $merge_text{$2};
-		    $buf_close .= "\n"; #was losig this somewhere.
-		    #delete $merge_text{$2};
-		} else {
-		    warn "no heading: $2" if ($have_merge_text);
-		    $buf_close .= "$_\n";
-		}
-	    }
-	};
-	#print CFH  if ($. >= $close[0][0] and $. <= $close[0][1]);
-	$buf_close .= $_  if ($. >= $close[0][0] and $. <= $close[0][1]);
-	shift @close if $. == $close[0][1];
-    };
-    close $page_fh;
+    $archive_page_content->merge($page_fh, \@close, $header_level);
 }
 
-foreach my $heading (@majors) {
-    $buf_close .= delete $merge_text{$heading} 
-    if (defined $merge_text{$heading});
-};
-foreach my $c (keys %merge_text) {
-    warn "unused heading: $c";
-};
-
-
+my $buf_close = $archive_page_content->text;
 Link::relocate ($page,$buf_close);
 
 ##############################
