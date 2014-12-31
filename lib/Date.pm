@@ -3,26 +3,35 @@ use strict;
 
 my @months=qw(January February March April May June July August September October November December);
 
+my %months;
+for my $i (0..11) {
+    $months{$months[$i]} = $i;
+};
+
+my $month_string = join '|', @months;
+our $month_re = qr/$month_string/;
+
 sub set {
   my $self = shift;
   my $date = shift;
 
   if (ref $date) {
-    $self->{date} = $date->{d}+$date->{m}*100+$date->{y}*10_000;
+    my $m = defined($date->{m}) ? $date->{m} : $months{$date->{month}};
+    $self->{date} = $date->{d}+$m*100+$date->{y}*10_000;
   } else {
     $self->{date} = $date ;
   }
 }
 
-sub unset {
-  my $self = shift;
-  if (ref $self) {
-    $self->{date} = 0;
-  } else {
-    $self = bless {date=>0}, $self;
-  };
-  return $self;
-}
+# sub unset {
+#   my $self = shift;
+#   if (ref $self) {
+#     $self->{date} = 0;
+#   } else {
+#     $self = bless {date=>0}, $self;
+#   };
+#   return $self;
+# }
 
 sub new {
   my $class = shift;

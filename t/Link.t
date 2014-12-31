@@ -11,6 +11,7 @@ my %data = (
  );
 
 while (my ($before,$after) = each %data) {
+  my ($before, $after) = ($before, $after);
   $after //= $before;
   Link::relocate($page,$before);
   is ($before, $after, "dst: $before");
@@ -24,6 +25,7 @@ my %src_data = (
  );
 
 while (my ($before,$after) = each %src_data) {
+  my ($before, $after) = ($before, $after);
   $after //= $before;
   Link::relocate_src($page,['xx'],$before);
   is ($before, $after, "src: $before");

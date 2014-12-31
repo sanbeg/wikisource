@@ -40,4 +40,8 @@ is($prev_year->month, 2, 'got month');
 is($prev_year->month_name, 'February', 'got month name');
 is($prev_year->day, 13, 'got day');
 
+is(Date->new(date=>{m=>9, d=>1,y=>2014})->month, 10, 'got month number');
+is(Date->new(date=>{month=>'October',d=>1,y=>2014})->month,10,'got month name');
+is(Date->new(date=>2014_09_02)->month, 10, 'month starts at 0');
+
 done_testing;

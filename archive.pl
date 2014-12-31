@@ -65,16 +65,6 @@ my $archive_summary = '*' . $archive_date->link . '<small>';
 $cut_date=Date->new(date=>$cut_date, days=>$n_days);
 ##############################  
 
-my @months=qw(January February March April May June July August September October November December);
-
-my %months;
-for my $i (0..11) {
-    $months{$months[$i]} = $i;
-};
-
-my $month_string = join '|', @months;
-my $month_re = qr/$month_string/;
-
 my $tlevel=7;
 my $tline;
 my $tdate;
@@ -129,10 +119,10 @@ sub find_closed_sections {
 				#$archive_summary .=  "\n**[[$anchor#$2|$2]]";
 			};
 		};
-		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${month_re}) ([0-9]{4}) \(UTC\)/ 
+		m/[0-9][0-9]:[0-9][0-9], ([0-9]{1,2}) (${Date::month_re}) ([0-9]{4}) \(UTC\)/ 
 		  and do  {
 			  #print "$1 $2\n" if $debug;
-			  my $nd=Date->new(date=>{y=>$3,m=>$months{$2},d=>$1});
+			  my $nd=Date->new(date=>{y=>$3,month=>$2,d=>$1});
 			  $tdate = $nd if $nd > $tdate;
 		  }
 	};
