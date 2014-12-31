@@ -16,8 +16,8 @@ sub set {
   my $date = shift;
 
   if (ref $date) {
-    my $m = defined($date->{m}) ? $date->{m} : $months{$date->{month}};
-    $self->{date} = $date->{d}+$m*100+$date->{y}*10_000;
+    my $month = $months{$date->{month}};
+    $self->{date} = $date->{d}+$month*100+$date->{y}*10_000;
   } else {
     $self->{date} = $date ;
   }
