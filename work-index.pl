@@ -13,7 +13,7 @@ use passwd;
 
 my $be_anon;
 my $do_edit;
-
+my $comment = 'Create index of works';
 #skip various disambig pages
 my %bl = (
 	  'Category:Mainspace disambiguation pages' => 1,
@@ -28,6 +28,7 @@ my $l1 = 'a';
 GetOptions (
 	    'letter=s' => \$l1,
 	    'edit!' => \$do_edit,
+	    'comment=s' => \$comment,
 	    'username=s'=>\$username, 'password=s'=>\$password,
 	   ) or die;
 
@@ -76,7 +77,8 @@ my $text = '<div style="clear:right; margin-bottom:.5em; float:right; padding:.5
 
 foreach my $letter ( 'a' .. 'z' ) {
   my $prefix = ucfirst "$l1$letter";
-  $text .= "\n== $prefix ==\n\n";
+  my $subtext = "\n== $prefix ==\n\n";
+  my $count = 0;
 
   my $articles = $wiki->api->list({
     action => 'query',
@@ -97,21 +99,22 @@ foreach my $letter ( 'a' .. 'z' ) {
 
   #while ( my ($page, $cats) = each %page_cats ) {
   foreach my $page ( sort keys %page_cats ) {
-    #$page = decode_utf8($page);
-    my $cats = $page_cats{$page};
+      #$page = decode_utf8($page);
+      my $cats = $page_cats{$page};
 
-    $text .= "* {{works-title|[[$page]]}}";
-    if (@$cats) {
-      $text .= " &mdash; (".
-	join(', ', map("[[:$_|]]",@$cats)).
-	")";
-    };
-    $text .=  "\n";
+      $subtext .= "* {{works-title|[[$page]]}}";
+      if (@$cats) {
+	  $subtext .= " &mdash; (".
+	    join(', ', map("[[:$_|]]",@$cats)).
+	    ")";
+      };
+      $subtext .=  "\n";
+      ++ $count;
   };
+  $text .= $subtext if $count > 0;
 
   %page_cats = ();
-  sleep 1;
-
+  select(undef,undef,undef,0.25);
 }
 
 open T, '>tmp';
@@ -119,6 +122,6 @@ print T encode_utf8(decode_utf8($text));
 
 if ($do_edit) {
   #close $fh;
-  $wiki->get_page ("Wikisource:Works-\u$l1")->edit($text, 'Create index of works');
+  $wiki->get_page ("Wikisource:Works-\u$l1")->edit($text, $comment);
 }
 
