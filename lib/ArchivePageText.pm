@@ -7,6 +7,7 @@ my $heading_re = qr/^(\=+)\s*(.+?)\s*\1$/;
 sub new {
     my ($class, $text) = @_;
     croak "Missing text" unless defined $text;
+    $text .= "\n" unless $text =~ m/\n$/;
     bless {text=>$text}, $class;
 }
 

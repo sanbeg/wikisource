@@ -204,7 +204,7 @@ if ($archive_subpage_object->exists) {
     warn "$subpage exists, merging";
     $archive_page_content = ArchivePageText->new($archive_subpage_object->get_text);
 } elsif (@close) {
-    $archive_page_content = ArchivePageText->new("{{archive header}}\n");
+    $archive_page_content = ArchivePageText->new('{{archive header}}');
 } else {
     die "No closed threads to index";
 }
